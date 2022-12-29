@@ -335,7 +335,7 @@ class FY6900Serial(FunctionGenerator):
 
 		# Frequency is transmitted in micro Hz ...
 
-		res = res / 10e6
+		res = res / 1e6
 		if (res < 0) or (res > self._maxfrq):
 			raise CommunicationError_ProtocolViolation(f"Received frequency {res} Hz is out of range of supported frequency of this device")
 
@@ -346,7 +346,7 @@ class FY6900Serial(FunctionGenerator):
 			raise ValueError(f"Requested frequency {frequency} is out of supported frequency range of this device")
 
 		# Frequency is transmitted in micro Hz
-		f = frequency * 10e6
+		f = frequency * 1e6
 
 		if channel == 0:
 			self._sendCommand(f"WMF{float(f):.0f}")
