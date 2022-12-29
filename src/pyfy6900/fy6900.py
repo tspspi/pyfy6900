@@ -12,7 +12,9 @@ class FY6900Serial(FunctionGenerator):
 
 		serialPort = "/dev/ttyU0",
 		serialCommandDelay = 0.1,
-		debug = False
+		debug = False,
+
+		commandRetries = 3
 	):
 		super().__init__(
 			nchannels = 2,
@@ -63,10 +65,16 @@ class FY6900Serial(FunctionGenerator):
 
 			supportedModulations = [
 				FunctionGeneratorModulation.NONE,
-				FunctionGeneratorModulation.AMPLITUDE,
-				FunctionGeneratorModulation.FREQUENCY,
-				FunctionGeneratorModulation.PHASE
-			]
+				FunctionGeneratorModulation.ASK,
+				FunctionGeneratorModulation.FSK,
+				FunctionGeneratorModulation.PSK,
+				FunctionGeneratorModulation.TRIGGER,
+				FunctionGeneratorModulation.AM,
+				FunctionGeneratorModulation.FM,
+				FunctionGeneratorModulation.PM
+			],
+
+			commandRetries = commandRetries
 		)
 
 		self._portName = serialPort
@@ -157,8 +165,17 @@ class FY6900Serial(FunctionGenerator):
 		return reply
 
 	def _off(self):
-		# ToDo
-		pass
+		try:
+			self._set_channel_enabled(0, False)
+		except:
+			pass
+
+		try:
+			self._set_channel_enabled(1, False)
+		except:
+			pass
+
+		return True
 
 	def _initialRequests(self):
 		# Identify and set to a well known state
@@ -175,6 +192,8 @@ class FY6900Serial(FunctionGenerator):
 			self._maxfrq = maxfrq * 10e6
 		except:
 			raise CommunicationError_ProtocolViolation(f"Failed to parse maximum frequency in device identification string {self._identification_string}")
+
+		self._serialnumber = self._serial()
 
 	def _id(self):
 		res = self._sendCommand("UMO")
@@ -503,45 +522,10 @@ class FY6900Serial(FunctionGenerator):
 
 		return True
 
-	def _set_trigger_mode(self, channel = None, triggerMode = None):
-		raise NotImplementedException()
-	def _set_trigger_source(self, channel = None, triggerMode = None):
-		raise NotImplementedException()
-
-	def _trigger(self):
-		raise NotImplementedException()
-
-	def _set_triggered_pulse_count(self, channel = None, pulsecount = None):
-		raise NotImplementedException()
-
-
-	def _set_fsk_frequency(self, channel = None, fskSecondaryFrequency = None):
-		raise NotImplementedException()
-	def _set_am_modulation_rate(self, channel = None, rate = None):
-		raise NotImplementedException()
-	def _set_fm_modulation_freq_offset(self, channel = None, offset = None):
-		raise NotImplementedException()
-	def _set_pm_modulation_phaseoffset(self, channel = None, offset = None):
-		raise NotImplementedException()
-
-	def _set_counter_coupling_mode(self, channel = None, couplingMode = None):
-		raise NotImplementedException()
-	def _counter_reset(self, counterChannel = None):
-		raise NotImplementedException()
-	def _counter_pause(self, counterChannel = None):
-		raise NotImplementedException()
-
-	def _set_counter_gatetime(self, gatetime = None, counterChannel = None):
-		raise NotImplementedException()
-
-	def _get_counter_frequency(self, counterChannel = None):
-		raise NotImplementedException()
-	def _get_counter_value(self, counterChannel = None):
-		raise NotImplementedException()
-	def _get_counter_period(self, counterChannel = None):
-		raise NotImplementedException()
-	def _get_counter_pulsewidth_and_period(self, counterChannel = None):
-		# Reads period, duty cycle, positive pulse width and negatie pulse width
-		raise NotImplementedException()
-
-	# ToDo: Sweep
+	# Currently not implemented:
+	#	Modulation configuration
+	#	Measurement (Counter)
+	#	Sweeping
+	#	Synchronization mode
+	#	Buzzer on/off
+	#	Uplink mode and status
