@@ -5,6 +5,7 @@ from time import sleep
 
 import serial
 import atexit
+import struct
 
 class FY6900Serial(FunctionGenerator):
 	def __init__(
@@ -23,6 +24,9 @@ class FY6900Serial(FunctionGenerator):
 			offsetrange = ( -24.0, 24.0 ),
 
 			arbitraryWaveforms = True,
+			arbitraryWaveformLength = (8192, 8192),
+			arbitraryWaveformMinMax = (0, 16383),
+			arbitraryNormalizeInDriver = True,
 			hasFrequencyCounter = True,
 
 			supportedWaveforms = [
@@ -209,11 +213,14 @@ class FY6900Serial(FunctionGenerator):
 		res = res.strip()
 		return res
 
-	def _set_channel_waveform(self, channel = None, waveform = None):
-		if (channel is None) or (waveform is None):
+	def _set_channel_waveform(self, channel = None, waveform = None, arbitrary = None):
+		if (channel is None) or ((waveform is None) and (arbitrary is None)):
 			raise ValueError("Missing waveform or channel specification")
 
-		if not isinstance(waveform, FunctionGeneratorWaveform):
+		if (waveform is not None) and (arbitrary is not None):
+			raise ValueError("Either predefined waveform or arbitrary channel has to be specified, not both")
+
+		if (not isinstance(waveform, FunctionGeneratorWaveform)) and (not isinstance(arbitrary, int)):
 			raise ValueError("The waveform has to be specified via FunctionGeneratorWaveform enum")
 
 		waveformNumberMap = {
@@ -252,13 +259,21 @@ class FY6900Serial(FunctionGenerator):
 			FunctionGeneratorWaveform.ECGSIMULATION : 28
 		}
 
-		if waveform not in waveformNumberMap:
-			raise ValueError("The supplied waveform is not supported by the FY6900 directly")
+		if not isinstance(arbitrary, int):
+			if waveform not in waveformNumberMap:
+				raise ValueError("The supplied waveform is not supported by the FY6900 directly")
+		else:
+			if (arbitrary < 0) or (arbitrary >= 64):
+				raise ValueError("The supplied arbitrary waveform index is invalid. The FY6900 supports 64 slots (0-63)")
 
-		if channel == 0:
+		if (channel == 0) and (not isinstance(arbitrary, int)):
 			self._sendCommand(f"WMW{waveformNumberMap[waveform]}")
-		elif channel == 1:
+		elif (channel == 1) and (not isinstance(arbitrary, int)):
 			self._sendCommand(f"WFW{waveformNumberMap[waveform]}")
+		elif (channel == 0) and (isinstance(arbitrary, int)):
+			self._sendCommand(f"WMW{36 + arbitrary:02.0f}")
+		elif (channel == 1) and (isinstance(arbitrary, int)):
+			self._sendCommand(f"WFW{36 + arbitrary:02.0f}")
 		else:
 			raise ValueError(f"Channel number {channel} is not supported")
 
@@ -525,3 +540,45 @@ class FY6900Serial(FunctionGenerator):
 	#	Synchronization mode
 	#	Buzzer on/off
 	#	Uplink mode and status
+
+	# User defined arbitrary waveforms
+
+	def _upload_waveform(self, slot, wavedata, normalize = False):
+		slot = int(slot)
+		if (slot < 0) or (slot > 63):
+			raise ValueError("The FY6900 only offers 64 slots for arbitrary waveforms")
+
+		if len(wavedata) != 8192:
+			raise ValueError("Waveform data for FY6900 is required to be exactly 8192 samples long")
+
+		if normalize:
+			mi = min(wavedata)
+			mx = max(wavedata)
+			rng = mx - mi
+			if rng == 0:
+				rng = 1
+			for i in range(len(wavedata)):
+				wavedata[i] = ((wavedata[i] - mi) / rng) * 16383
+
+		if (min(wavedata) < 0) or (max(wavedata) > 16383):
+			raise ValueError("The 14 bit DDS DAC requires values from 0 to 16383")
+
+		# Now transmit into the given channel ...
+		resp = self._sendCommand(f"DDS_WAVE{(slot+1):02.0f}\n")
+		if resp != "W":
+			raise CommunicationError_ProtocolViolation(f"Failed to upload DDS wave into slot {slot}, unexpected response {resp}")
+
+		# Transmit data ...
+		for b in wavedata:
+			# Encode as binary structure with words (16 bits) in big endian
+			b = struct.pack('>H', int(b))
+			self._port.write(b)
+
+		# Send some dummy command that will timeout anyways ...
+		for i in range(3):
+			try:
+				self._id()
+			except CommunicationError_Timeout:
+				pass
+
+		return True
