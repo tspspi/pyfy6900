@@ -4,6 +4,12 @@ This is a small and simple control library for the FY6900 function generator. It
 a implementation for the [pylabdevs](https://github.com/tspspi/pylabdevs) ```FunctionGenerator```
 class.
 
+# Installation
+
+```
+pip install pyfy6900-tspspi
+```
+
 # Example usage
 
 ## Simple setting of predefined waveforms and parameters
