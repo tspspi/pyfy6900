@@ -1,0 +1,2 @@
+pylabdevs-tspspi >= 0.0.5
+pyserial >= 3.5
