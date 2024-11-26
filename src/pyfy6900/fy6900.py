@@ -14,6 +14,7 @@ class FY6900Serial(FunctionGenerator):
 		serialPort = "/dev/ttyU0",
 		serialCommandDelay = 0.1,
 		debug = False,
+		shutdownOnExit = True,
 
 		commandRetries = 3
 	):
@@ -87,6 +88,7 @@ class FY6900Serial(FunctionGenerator):
 		self._usedConnect = False
 		self._debug = debug
 
+		self._shutdownOnExit = shutdownOnExit
 		atexit.register(self.__close)
 
 	# Context handling
@@ -104,7 +106,8 @@ class FY6900Serial(FunctionGenerator):
 	def __close(self):
 		atexit.unregister(self.__close)
 		if (self._port is not None) and (self._portName is not None):
-			self._off()
+			if self._shutdownOnExit:
+				self._off()
 			self._port.close()
 			self._port = None
 
